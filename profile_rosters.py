@@ -49,6 +49,11 @@ def date_format_profile(conn, table, col):
         GROUP BY fmt
     """))
 
+def convert_date_format(col, table):
+    if table == "roster_2":
+        return f"substr({col},7,4) || '-' || substr({col}, 1,2) || '-' || substr({col}, 4,2)"
+    return col
+
 conn = sqlite3.connect(DB_PATH)
 # for table in ROSTERS:
 #     basic_column_profile(conn, table, "DoB")
@@ -93,3 +98,48 @@ print(run(conn, f"""
     GROUP BY n_rosters
     ORDER BY n_rosters
 """))
+
+parts = []
+for t in ROSTERS:
+    parts.append(f"""
+    SELECT '{t}' AS roster, Person_Id, First_name, Last_name, 
+    {convert_date_format('DoB', t)} AS DoB,
+    Street_Address, City, State, Zip, payer,
+    {convert_date_format('eligibility_start_date', t)} AS eligibility_start_date,
+    {convert_date_format('eligibility_end_date', t)} AS eligibility_end_date
+    FROM {t}""")
+conn.execute("DROP VIEW IF EXISTS stacked")
+conn.execute("CREATE TEMP VIEW stacked AS " + " UNION ALL ".join(parts))
+
+#pair up rows of duplicate ids count differences
+print("\n--- duplicate pairs---")
+print("(roster_a, roster_b, pairs, first, last, dob, address, zip, payer, start, end)")
+for row in run(conn, """
+    SELECT a.roster, b.roster, COUNT(*) AS pairs,
+    SUM(a.First_name != b.First_name),
+    SUM(a.Last_name != b.Last_name),
+    SUM(a.DoB != b.DoB),
+    SUM(a.Street_Address != b.Street_Address),
+    SUM(a.Zip != b.Zip),
+    SUM(a.payer != b.payer),
+    SUM(a.eligibility_start_date != b.eligibility_start_date),
+    SUM(a.eligibility_end_date != b.eligibility_end_date)
+    FROM stacked a
+    JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
+    GROUP BY a.roster, b.roster
+    ORDER BY pairs DESC"""
+    ):
+    print(row)
+
+#see a few pairs side by side
+print("\n --- sample duplicate pairs --- ")
+for row in run(conn,"""
+    SELECT a.Person_Id, a.roster, a.payer, a.eligibility_start_date, a.eligibility_end_date,
+    b.roster, b.payer, b.eligibility_start_date, b.eligibility_end_date
+    FROM stacked a
+    JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
+    LIMIT 10
+
+
+"""):
+    print(row)
