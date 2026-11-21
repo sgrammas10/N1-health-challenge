@@ -66,14 +66,30 @@ conn = sqlite3.connect(DB_PATH)
 
 
 # Is Person_Id unique within each roster?
-for table in ROSTERS:
-    print(f"\n--- {table}.Person_Id ---")
-    print(run(conn, f"""
-        SELECT COUNT(*) AS total_rows,
-                COUNT(DISTINCT Person_Id) AS distinct_ids
-        FROM {table}
-    """))
-    print("samples:", run(conn, f"SELECT Person_Id FROM {table} LIMIT 5"))
+# for table in ROSTERS:
+#     print(f"\n--- {table}.Person_Id ---")
+#     print(run(conn, f"""
+#         SELECT COUNT(*) AS total_rows,
+#                 COUNT(DISTINCT Person_Id) AS distinct_ids
+#         FROM {table}
+#     """))
+#     print("samples:", run(conn, f"SELECT Person_Id FROM {table} LIMIT 5"))
 
-for table in ROSTERS:
-    basic_column_profile(conn, table, "Person_Id")
+# for table in ROSTERS:
+#     basic_column_profile(conn, table, "Person_Id")
+
+
+stacked = " UNION ALL ".join(
+    f"SELECT Person_Id, '{t}' AS roster FROM {t}" for t in ROSTERS
+)
+
+#how many rosters does each id appear in
+print("\n--- Person_Id roster counts ---")
+print(run(conn, f"""
+    SELECT n_rosters, COUNT(*) AS n_ids
+    FROM (SELECT Person_id, COUNT(*) AS n_rosters
+          FROM ({stacked})
+          GROUP BY Person_id)
+    GROUP BY n_rosters
+    ORDER BY n_rosters
+"""))
