@@ -53,14 +53,27 @@ conn = sqlite3.connect(DB_PATH)
 # for table in ROSTERS:
 #     basic_column_profile(conn, table, "DoB")
 
-DATE_COLS = ["DoB", "eligibility_start_date", "eligibility_end_date"]
-for col in DATE_COLS:
-    for table in ROSTERS:
-        date_format_profile(conn, table, col)
-
-
+# DATE_COLS = ["DoB", "eligibility_start_date", "eligibility_end_date"]
+# for col in DATE_COLS:
+#     for table in ROSTERS:
+#         date_format_profile(conn, table, col)
 
 #quick check for roster 2 data
 # for col in ["Dob", "eligibility_start_date", "eligibility_end_date"]:
 #     print(f"\n--- roster_2.{col} ---")
 #     print(run(conn, f"SELECT DISTINCT {col} FROM roster_2 LIMIT 50"))
+
+
+
+# Is Person_Id unique within each roster?
+for table in ROSTERS:
+    print(f"\n--- {table}.Person_Id ---")
+    print(run(conn, f"""
+        SELECT COUNT(*) AS total_rows,
+                COUNT(DISTINCT Person_Id) AS distinct_ids
+        FROM {table}
+    """))
+    print("samples:", run(conn, f"SELECT Person_Id FROM {table} LIMIT 5"))
+
+for table in ROSTERS:
+    basic_column_profile(conn, table, "Person_Id")
