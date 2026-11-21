@@ -89,15 +89,15 @@ stacked = " UNION ALL ".join(
 )
 
 #how many rosters does each id appear in
-print("\n--- Person_Id roster counts ---")
-print(run(conn, f"""
-    SELECT n_rosters, COUNT(*) AS n_ids
-    FROM (SELECT Person_id, COUNT(*) AS n_rosters
-          FROM ({stacked})
-          GROUP BY Person_id)
-    GROUP BY n_rosters
-    ORDER BY n_rosters
-"""))
+# print("\n--- Person_Id roster counts ---")
+# print(run(conn, f"""
+#     SELECT n_rosters, COUNT(*) AS n_ids
+#     FROM (SELECT Person_id, COUNT(*) AS n_rosters
+#           FROM ({stacked})
+#           GROUP BY Person_id)
+#     GROUP BY n_rosters
+#     ORDER BY n_rosters
+# """))
 
 parts = []
 for t in ROSTERS:
@@ -112,34 +112,88 @@ conn.execute("DROP VIEW IF EXISTS stacked")
 conn.execute("CREATE TEMP VIEW stacked AS " + " UNION ALL ".join(parts))
 
 #pair up rows of duplicate ids count differences
-print("\n--- duplicate pairs---")
-print("(roster_a, roster_b, pairs, first, last, dob, address, zip, payer, start, end)")
-for row in run(conn, """
-    SELECT a.roster, b.roster, COUNT(*) AS pairs,
-    SUM(a.First_name != b.First_name),
-    SUM(a.Last_name != b.Last_name),
-    SUM(a.DoB != b.DoB),
-    SUM(a.Street_Address != b.Street_Address),
-    SUM(a.Zip != b.Zip),
-    SUM(a.payer != b.payer),
-    SUM(a.eligibility_start_date != b.eligibility_start_date),
-    SUM(a.eligibility_end_date != b.eligibility_end_date)
-    FROM stacked a
-    JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
-    GROUP BY a.roster, b.roster
-    ORDER BY pairs DESC"""
-    ):
-    print(row)
+# print("\n--- duplicate pairs---")
+# print("(roster_a, roster_b, pairs, first, last, dob, address, zip, payer, start, end)")
+# for row in run(conn, """
+#     SELECT a.roster, b.roster, COUNT(*) AS pairs,
+#     SUM(a.First_name != b.First_name),
+#     SUM(a.Last_name != b.Last_name),
+#     SUM(a.DoB != b.DoB),
+#     SUM(a.Street_Address != b.Street_Address),
+#     SUM(a.Zip != b.Zip),
+#     SUM(a.payer != b.payer),
+#     SUM(a.eligibility_start_date != b.eligibility_start_date),
+#     SUM(a.eligibility_end_date != b.eligibility_end_date)
+#     FROM stacked a
+#     JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
+#     GROUP BY a.roster, b.roster
+#     ORDER BY pairs DESC"""
+#     ):
+#     print(row)
 
 #see a few pairs side by side
-print("\n --- sample duplicate pairs --- ")
-for row in run(conn,"""
-    SELECT a.Person_Id, a.roster, a.payer, a.eligibility_start_date, a.eligibility_end_date,
-    b.roster, b.payer, b.eligibility_start_date, b.eligibility_end_date
-    FROM stacked a
-    JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
-    LIMIT 10
+# print("\n --- sample duplicate pairs --- ")
+# for row in run(conn,"""
+#     SELECT a.Person_Id, a.roster, a.payer, a.eligibility_start_date, a.eligibility_end_date,
+#     b.roster, b.payer, b.eligibility_start_date, b.eligibility_end_date
+#     FROM stacked a
+#     JOIN stacked b ON a.Person_Id = b.Person_Id AND a.roster < b.roster
+#     LIMIT 10
 
 
+# """):
+#     print(row)
+
+print("\n--- payer values by roster ---")
+for row in run(conn, """
+    SELECT roster, payer, COUNT(*) AS n
+    FROM stacked
+    GROUP BY roster, payer
+    ORDER BY roster, n DESC
+"""):
+    print(row)  
+
+print("\n--- State values ---")
+print(run(conn, """
+    SELECT State, COUNT(*) FROM stacked
+    GROUP BY State ORDER BY COUNT(*) DESC
+"""))
+
+print("\n--- Zip types and lengths by roster ---")
+for row in run(conn, """
+    SELECT roster, typeof(Zip), LENGTH(Zip), COUNT(*)
+    FROM stacked
+    GROUP BY roster, typeof(Zip), LENGTH(Zip)
 """):
     print(row)
+
+print("\n--- Zip samples ---")
+print(run(conn, "SELECT DISTINCT Zip FROM stacked LIMIT 15"))
+
+
+print("\n--- zcta in scores table ---")
+print(run(conn, """
+    SELECT typeof(zcta), COUNT(*), COUNT(DISTINCT zcta)
+    FROM model_scores_by_zip
+    GROUP BY typeof(zcta)
+"""))
+
+print("\n--- member zip match rate ---")
+print(run(conn, """
+    SELECT COUNT(*) AS member_rows,
+            SUM(m.zcta IS NOT NULL) AS matched,
+            SUM(m.zcta IS NULL)     AS unmatched
+    FROM stacked s
+    LEFT JOIN model_scores_by_zip m
+        ON CAST(s.Zip AS INTEGER) = m.zcta
+"""))
+
+
+print(run(conn, """
+    SELECT SUM(food_access_score IS NULL),
+           SUM(social_isolation_score IS NULL),
+           SUM(algorex_sdoh_composite_score IS NULL),
+           MIN(food_access_score), MAX(food_access_score),
+           MIN(algorex_sdoh_composite_score), MAX(algorex_sdoh_composite_score)
+    FROM model_scores_by_zip
+"""))
