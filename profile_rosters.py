@@ -35,6 +35,32 @@ def basic_column_profile(conn, table, col):
         SELECT DISTINCT {col} FROM {table} LIMIT 5
     """))
 
+def date_format_profile(conn, table, col):
+    print(f"\n--- {table}.{col} ---")
+    print(run(conn, f"""
+        SELECT CASE
+                 WHEN {col} IS NULL OR TRIM({col}) = '' THEN 'missing'
+                 WHEN substr({col}, 5, 1) = '-'         THEN 'YYYY-MM-DD'
+                 WHEN substr({col}, 3, 1) = '/'         THEN 'XX/XX/YYYY'
+                 ELSE 'other'
+               END AS fmt,
+               COUNT(*)
+        FROM {table}
+        GROUP BY fmt
+    """))
+
 conn = sqlite3.connect(DB_PATH)
-for table in ROSTERS:
-    basic_column_profile(conn, table, "DoB")
+# for table in ROSTERS:
+#     basic_column_profile(conn, table, "DoB")
+
+DATE_COLS = ["DoB", "eligibility_start_date", "eligibility_end_date"]
+for col in DATE_COLS:
+    for table in ROSTERS:
+        date_format_profile(conn, table, col)
+
+
+
+#quick check for roster 2 data
+# for col in ["Dob", "eligibility_start_date", "eligibility_end_date"]:
+#     print(f"\n--- roster_2.{col} ---")
+#     print(run(conn, f"SELECT DISTINCT {col} FROM roster_2 LIMIT 50"))
