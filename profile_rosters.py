@@ -144,56 +144,64 @@ conn.execute("CREATE TEMP VIEW stacked AS " + " UNION ALL ".join(parts))
 # """):
 #     print(row)
 
-print("\n--- payer values by roster ---")
-for row in run(conn, """
-    SELECT roster, payer, COUNT(*) AS n
+# print("\n--- payer values by roster ---")
+# for row in run(conn, """
+#     SELECT roster, payer, COUNT(*) AS n
+#     FROM stacked
+#     GROUP BY roster, payer
+#     ORDER BY roster, n DESC
+# """):
+#     print(row)  
+
+# print("\n--- State values ---")
+# print(run(conn, """
+#     SELECT State, COUNT(*) FROM stacked
+#     GROUP BY State ORDER BY COUNT(*) DESC
+# """))
+
+# print("\n--- Zip types and lengths by roster ---")
+# for row in run(conn, """
+#     SELECT roster, typeof(Zip), LENGTH(Zip), COUNT(*)
+#     FROM stacked
+#     GROUP BY roster, typeof(Zip), LENGTH(Zip)
+# """):
+#     print(row)
+
+# print("\n--- Zip samples ---")
+# print(run(conn, "SELECT DISTINCT Zip FROM stacked LIMIT 15"))
+
+
+# print("\n--- zcta in scores table ---")
+# print(run(conn, """
+#     SELECT typeof(zcta), COUNT(*), COUNT(DISTINCT zcta)
+#     FROM model_scores_by_zip
+#     GROUP BY typeof(zcta)
+# """))
+
+# print("\n--- member zip match rate ---")
+# print(run(conn, """
+#     SELECT COUNT(*) AS member_rows,
+#             SUM(m.zcta IS NOT NULL) AS matched,
+#             SUM(m.zcta IS NULL)     AS unmatched
+#     FROM stacked s
+#     LEFT JOIN model_scores_by_zip m
+#         ON CAST(s.Zip AS INTEGER) = m.zcta
+# """))
+
+
+# print(run(conn, """
+#     SELECT SUM(food_access_score IS NULL),
+#            SUM(social_isolation_score IS NULL),
+#            SUM(algorex_sdoh_composite_score IS NULL),
+#            MIN(food_access_score), MAX(food_access_score),
+#            MIN(algorex_sdoh_composite_score), MAX(algorex_sdoh_composite_score)
+#     FROM model_scores_by_zip
+# """))
+
+print(run(conn, """
+    SELECT MIN(eligibility_start_date), MAX(eligibility_start_date),
+            MIN(eligibility_end_date),   MAX(eligibility_end_date),
+            SUM(eligibility_end_date <  eligibility_start_date) AS end_before_start,
+            SUM(eligibility_end_date =  eligibility_start_date) AS same_day
     FROM stacked
-    GROUP BY roster, payer
-    ORDER BY roster, n DESC
-"""):
-    print(row)  
-
-print("\n--- State values ---")
-print(run(conn, """
-    SELECT State, COUNT(*) FROM stacked
-    GROUP BY State ORDER BY COUNT(*) DESC
-"""))
-
-print("\n--- Zip types and lengths by roster ---")
-for row in run(conn, """
-    SELECT roster, typeof(Zip), LENGTH(Zip), COUNT(*)
-    FROM stacked
-    GROUP BY roster, typeof(Zip), LENGTH(Zip)
-"""):
-    print(row)
-
-print("\n--- Zip samples ---")
-print(run(conn, "SELECT DISTINCT Zip FROM stacked LIMIT 15"))
-
-
-print("\n--- zcta in scores table ---")
-print(run(conn, """
-    SELECT typeof(zcta), COUNT(*), COUNT(DISTINCT zcta)
-    FROM model_scores_by_zip
-    GROUP BY typeof(zcta)
-"""))
-
-print("\n--- member zip match rate ---")
-print(run(conn, """
-    SELECT COUNT(*) AS member_rows,
-            SUM(m.zcta IS NOT NULL) AS matched,
-            SUM(m.zcta IS NULL)     AS unmatched
-    FROM stacked s
-    LEFT JOIN model_scores_by_zip m
-        ON CAST(s.Zip AS INTEGER) = m.zcta
-"""))
-
-
-print(run(conn, """
-    SELECT SUM(food_access_score IS NULL),
-           SUM(social_isolation_score IS NULL),
-           SUM(algorex_sdoh_composite_score IS NULL),
-           MIN(food_access_score), MAX(food_access_score),
-           MIN(algorex_sdoh_composite_score), MAX(algorex_sdoh_composite_score)
-    FROM model_scores_by_zip
 """))
