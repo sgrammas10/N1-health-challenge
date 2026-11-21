@@ -29,6 +29,7 @@ def create_stacked_view(conn):
     conn.execute("CREATE TEMP VIEW stacked AS " + " UNION ALL ".join(parts))
 
 def build_std_member_info(conn):
+    """combine, standardize, filter to eligibility year and dedupe into one row per member"""
     year_start = f"{ELIGIBILITY_YEAR}-01-01"
     year_end = f"{ELIGIBILITY_YEAR}-12-31"
     conn.execute("DROP TABLE IF EXISTS std_member_info")
@@ -50,8 +51,33 @@ def build_std_member_info(conn):
         WHERE eligibility_start_date <= '{year_end}'
           AND eligibility_end_date   >= '{year_start}'
     """)
+    conn.commit()
+
+def verify(conn):
+    total, distinct = conn.execute(
+        "SELECT COUNT(*), COUNT(DISTINCT member_id) FROM std_member_info"
+    ).fetchone()
+    print(f"std_member_info: {total} rows, {distinct} distinct members")
+    assert total == distinct, "More than one row per member"
 
 def main():
     conn = sqlite3.connect(DB_PATH)
     create_stacked_view(conn)
     build_std_member_info(conn)
+    verify(conn)
+
+    
+    # min_end, max_start, boundary = conn.execute("""
+    #     SELECT MIN(eligibility_end_date), MAX(eligibility_start_date),
+    #         SUM(eligibility_end_date = '2025-01-01')
+    #     FROM std_member_info
+    # """).fetchone()
+    # print(f"earliest end: {min_end}, latest start: {max_start}, boundary members: {boundary}")
+
+
+
+
+
+if __name__ == "__main__":
+    main()
+    
