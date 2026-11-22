@@ -60,13 +60,68 @@ def verify(conn):
     print(f"std_member_info: {total} rows, {distinct} distinct members")
     assert total == distinct, "More than one row per member"
 
+def answer_questions(conn):
+    q1 = conn.execute(f""" 
+        SELECT COUNT(DISTINCT member_id)
+        FROM std_member_info
+        WHERE eligibility_start_date <= '2025-04-30'
+            AND eligibility_end_date >= '2025-04-01'
+    """).fetchone()[0]
+    print(f"Q1. Members eligible in April 2025: {q1}")
+
+
+    q2 = conn.execute(f""" 
+        SELECT COUNT(*)
+        FROM (SELECT Person_Id FROM stacked GROUP BY Person_Id HAVING COUNT(*) > 1)
+    """).fetchone()[0]
+    print(f"Q2. Members appearing in more than one roster: {q2}")
+
+    print("Q3. Members by payer:")
+    for payer, n, pct in conn.execute(""" 
+        SELECT payer, COUNT(*) AS n, ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM std_member_info), 1) AS pct
+        FROM std_member_info
+        GROUP BY payer
+        ORDER BY n DESC
+    """):
+        print(f"{payer}: {n} ({pct}%)")
+
+    q4 = conn.execute(""" 
+        SELECT COUNT(DISTINCT s.member_id)
+        FROM std_member_info s
+        JOIN model_scores_by_zip m ON CAST(s.zip_code AS INTEGER) = m.zcta
+        WHERE m.food_access_score < 2
+    """).fetchone()[0]
+    print(f"Q4. Members in zips with food access score < 2: {q4}")
+
+    q5 = conn.execute(""" 
+        SELECT AVG(m.social_isolation_score)
+        FROM std_member_info s
+        JOIN model_scores_by_zip m ON CAST(s.zip_code AS INTEGER) = m.zcta
+    """).fetchone()[0]
+    print(f"Q5. Average social isolation score (across members): {q5:.2f}")
+
+    print("Q6. Members in the highest-SDOH-composite zip:")
+    rows = conn.execute(""" 
+        SELECT s.member_id, s.member_first_name, s.member_last_name, s.zip_code, m.algorex_sdoh_composite_score
+        FROM std_member_info s
+        JOIN model_scores_by_zip m ON CAST(s.zip_code AS INTEGER) = m.zcta
+        WHERE m.algorex_sdoh_composite_score = 
+            (SELECT MAX(algorex_sdoh_composite_score) FROM model_scores_by_zip)
+        ORDER BY s.member_last_name, s.member_first_name
+    """).fetchall()
+
+    print(f"{len(rows)} member(s)")
+    for row in rows:
+        print(f"    {row}")
+
 def main():
     conn = sqlite3.connect(DB_PATH)
     create_stacked_view(conn)
     build_std_member_info(conn)
     verify(conn)
+    answer_questions(conn)
 
-    
+
     # min_end, max_start, boundary = conn.execute("""
     #     SELECT MIN(eligibility_end_date), MAX(eligibility_start_date),
     #         SUM(eligibility_end_date = '2025-01-01')
